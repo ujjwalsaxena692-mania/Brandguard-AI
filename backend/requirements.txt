@@ -1,0 +1,14 @@
+# Runtime dependencies for the BrandGuard AI API (Part 01 foundation).
+# Lower bounds only; generate a lock file after the first successful install.
+#
+# Deliberately NOT included yet (added by the module that needs them):
+#   anthropic            - AI analysis engine
+#   PyMuPDF, python-docx - document parsing
+#   pytesseract          - OCR (also needs the Tesseract system binary)
+#   embedding provider SDK - chosen separately
+
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+python-dotenv>=1.0
+supabase>=2.0

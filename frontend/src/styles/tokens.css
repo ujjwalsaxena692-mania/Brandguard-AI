@@ -1,0 +1,52 @@
+/*
+ * BrandGuard AI design tokens - the single source of truth for the theme.
+ *
+ * Colours are space-separated RGB channels so Tailwind opacity modifiers work
+ * (e.g. bg-primary/10). Brand: professional red + white. Green/amber appear
+ * ONLY as semantic status colours; there is no blue or purple anywhere.
+ * Every text/background pairing below was contrast-checked (WCAG AA).
+ */
+:root {
+  /* Surfaces */
+  --background: 248 248 248; /* #F8F8F8 off-white page background */
+  --card: 255 255 255; /* #FFFFFF cards, panels, sidebar */
+  --card-foreground: 34 34 34;
+  --foreground: 34 34 34; /* #222222 dark charcoal text */
+  --muted: 243 243 243; /* #F3F3F3 hover / subtle fills */
+  --muted-foreground: 95 95 95; /* #5F5F5F secondary text */
+
+  /* Lines */
+  --border: 229 229 229; /* #E5E5E5 light grey borders */
+  --input: 138 138 138; /* #8A8A8A form-control border (3:1 for WCAG 1.4.11) */
+  --ring: 198 40 40; /* focus ring */
+
+  /* Brand red */
+  --primary: 198 40 40; /* #C62828 */
+  --primary-hover: 183 28 28; /* #B71C1C */
+  --primary-active: 155 25 25; /* #9B1919 */
+  --primary-soft: 253 236 236; /* #FDECEC tinted background */
+  --primary-soft-foreground: 155 25 25; /* text on primary-soft */
+  --primary-foreground: 255 255 255; /* text on primary */
+
+  /* Semantic status (used only where the meaning requires it) */
+  --success: 27 94 32; /* #1B5E20 */
+  --success-soft: 232 245 233; /* #E8F5E9 */
+  --warning: 138 83 0; /* #8A5300 */
+  --warning-soft: 255 244 224; /* #FFF4E0 */
+  --destructive: 155 25 25; /* #9B1919 */
+
+  /* Chart series: reds and neutrals only */
+  --chart-1: 198 40 40;
+  --chart-2: 107 107 107;
+  --chart-3: 229 115 115;
+  --chart-4: 34 34 34;
+
+  /* Shape and depth */
+  --radius: 0.75rem;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.06);
+  --shadow-elevated: 0 10px 30px rgb(0 0 0 / 0.12);
+
+  /* Typography (system stack: no external font requests) */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+}
