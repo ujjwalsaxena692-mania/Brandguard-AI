@@ -10,6 +10,7 @@ Request payloads are never echoed back in error details.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -44,6 +45,7 @@ class AppError(Exception):
         status_code: int | None = None,
         code: str | None = None,
         details: Any = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -52,6 +54,22 @@ class AppError(Exception):
         if code is not None:
             self.code = code
         self.details = details
+        # Extra HTTP response headers (e.g. WWW-Authenticate). Copied so instances never share state.
+        self.headers: dict[str, str] | None = dict(headers) if headers else None
+
+
+class AuthenticationError(AppError):
+    """The request carries no valid credentials (HTTP 401).
+
+    The message is fixed on purpose: why verification failed (expired, bad signature, wrong
+    audience, unknown key...) is logged server-side by the verifier and never sent to the client.
+    """
+
+    status_code = 401
+    code = "unauthorized"  # same code the generic HTTP 401 handler uses
+
+    def __init__(self) -> None:
+        super().__init__("Authentication required.", headers={"WWW-Authenticate": "Bearer"})
 
 
 class IntegrationNotConfiguredError(AppError):
@@ -120,7 +138,9 @@ async def _handle_app_error(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, AppError)
     log = logger.error if exc.status_code >= 500 else logger.warning
     log("AppError %s (%s): %s", exc.code, exc.status_code, exc.message)
-    return _error_response(request, exc.status_code, exc.code, exc.message, exc.details)
+    return _error_response(
+        request, exc.status_code, exc.code, exc.message, exc.details, exc.headers
+    )
 
 
 async def _handle_http_exception(request: Request, exc: Exception) -> JSONResponse:

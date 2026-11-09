@@ -1,88 +1,85 @@
-import { Activity, CheckCircle2, ClipboardCheck, Clock, FileText } from 'lucide-react'
-import { ComplianceTrendChart } from '@/components/compliance-trend-chart'
-import { StatCard } from '@/components/stat-card'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { FileText } from 'lucide-react'
+import { ComplianceOverview } from '@/components/dashboard/compliance-overview'
+import { KpiCards } from '@/components/dashboard/kpi-cards'
+import { PendingApprovals } from '@/components/dashboard/pending-approvals'
+import { QuickActions } from '@/components/dashboard/quick-actions'
+import { RecentActivity } from '@/components/dashboard/recent-activity'
+import { RecentChecks } from '@/components/dashboard/recent-checks'
+import { WelcomeSection } from '@/components/dashboard/welcome-section'
+import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
-import { PageHeader } from '@/components/ui/page-header'
-import { Table, TableBody, TableEmptyRow, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/loading-state'
+import { Notice } from '@/components/ui/notice'
 import { useAuth } from '@/hooks/use-auth'
+import { useDashboardData } from '@/hooks/use-dashboard-data'
 import { getDisplayName } from '@/lib/user'
-import type { CompliancePoint } from '@/types'
 
-// No data source exists yet, so these are intentionally empty (never mock data).
-const NO_COMPLIANCE_DATA: CompliancePoint[] = []
-
-const PENDING_COLUMNS = ['Content', 'Submitted by', 'Submitted', 'Status']
+function DashboardSkeleton() {
+  return (
+    <div role="status" aria-label="Loading dashboard" className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((key) => (
+          <Skeleton key={key} className="h-32" />
+        ))}
+      </div>
+      <Skeleton className="h-80" />
+      <Skeleton className="h-72" />
+    </div>
+  )
+}
 
 export function DashboardPage() {
   const { user } = useAuth()
-  const name = getDisplayName(user)
+  const { data, loading, error, refetch } = useDashboardData()
 
   return (
-    <>
-      <PageHeader
-        title={name ? `Welcome back, ${name}` : 'Welcome to BrandGuard AI'}
-        description="One Brand. Every Voice. Zero Compromise."
-      />
+    <div className="space-y-6">
+      <WelcomeSection name={getDisplayName(user)} />
 
-      <section aria-label="Submission overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total submissions" value={null} caption="No data yet" icon={FileText} />
-        <StatCard label="Awaiting analysis" value={null} caption="No data yet" icon={Clock} />
-        <StatCard label="Pending approval" value={null} caption="No data yet" icon={ClipboardCheck} />
-        <StatCard label="Approved" value={null} caption="No data yet" icon={CheckCircle2} />
-      </section>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle>Pending approvals</CardTitle>
-            <CardDescription>Content waiting for a human reviewer's decision.</CardDescription>
-          </CardHeader>
-          <CardContent className="px-0 pb-2 sm:px-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  {PENDING_COLUMNS.map((column) => (
-                    <TableHead key={column}>{column}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableEmptyRow
-                  colSpan={PENDING_COLUMNS.length}
-                  title="No pending approvals"
-                  description="Items awaiting review will appear here once content submission is available."
-                />
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
+      {loading ? (
+        <DashboardSkeleton />
+      ) : error ? (
         <Card>
-          <CardHeader>
-            <CardTitle>Recent activity</CardTitle>
-            <CardDescription>Latest submissions, analyses and decisions.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <EmptyState
-              compact
-              icon={Activity}
-              title="No activity yet"
-              description="Activity will be listed here as your team starts using BrandGuard AI."
-            />
-          </CardContent>
+          <ErrorState title="Couldn't load the dashboard" message={error.message} onRetry={refetch} />
         </Card>
-      </div>
+      ) : !data ? (
+        <Card>
+          <EmptyState
+            icon={FileText}
+            title="Nothing to show yet"
+            description="Dashboard figures will appear here once your team starts checking content."
+          />
+        </Card>
+      ) : (
+        <>
+          {data.source === 'demo' && (
+            <Notice tone="info">
+              Sample data: the figures, content and activity on this dashboard are demonstration values, not
+              live results from your organisation.
+            </Notice>
+          )}
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Compliance overview</CardTitle>
-          <CardDescription>Brand compliance scores over time.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ComplianceTrendChart data={NO_COMPLIANCE_DATA} />
-        </CardContent>
-      </Card>
-    </>
+          <KpiCards metrics={data.kpis} />
+
+          <div className="grid gap-6 xl:grid-cols-3">
+            <ComplianceOverview
+              className="xl:col-span-2"
+              averageScore={data.averageScore}
+              breakdown={data.breakdown}
+              trend={data.trend}
+            />
+            <QuickActions />
+          </div>
+
+          <RecentChecks checks={data.recentChecks} />
+
+          <div className="grid gap-6 xl:grid-cols-3">
+            <PendingApprovals className="xl:col-span-2" items={data.pendingApprovals} total={data.pendingTotal} />
+            <RecentActivity events={data.activity} />
+          </div>
+        </>
+      )}
+    </div>
   )
 }
