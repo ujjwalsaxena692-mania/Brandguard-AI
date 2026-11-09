@@ -23,3 +23,18 @@ Short records of choices made in Part 01, and why.
 - Roles: which of admin / brand manager / reviewer / contributor are needed?
 - Single organisation per user, or multiple memberships?
 - Supported document types and size limits for the knowledge hub.
+
+## Part 02A decisions (database and access control)
+
+15. **Multiple organisations per user.** One membership per (organisation, user); a user can belong to several organisations.
+16. **Four roles:** owner, admin, reviewer, creator. Statuses: `active`, `suspended` (removal deletes the row). Content-workflow permissions are deferred.
+17. **Ownership is protected.** At least one active owner always exists (trigger). Owners are never created by invitation.
+18. **Admins cannot create admins or owners.** Only owners grant `admin`/`owner`.
+19. **Clients cannot insert memberships or write audit logs.** Memberships come from `create_organisation()` / `accept_invitation()`; audit logs are written server-side.
+20. **Helper functions live in a non-exposed `private` schema** with `search_path = ''`; only two RPCs are public.
+21. **Column-level grants** keep clients away from identity columns (`user_id`, `organisation_id`, `slug`, `accepted_at`).
+22. **Profile trigger never blocks sign-up**; failures raise a warning and the profile can be backfilled.
+23. **Invitation tokens are hashed with SHA-256 by the backend**; the database enforces the hash format and compares hashes only.
+24. **RLS is enabled but not forced**, so the SECURITY DEFINER helpers avoid policy recursion.
+25. **`psycopg` added to dev requirements only**, for database integration tests (not a runtime dependency).
+26. **Open from Part 01 resolved:** roles and multi-membership are decided above. Still open: embedding provider/vector dimension, document types and size limits.

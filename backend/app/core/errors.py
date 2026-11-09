@@ -64,6 +64,40 @@ class IntegrationNotConfiguredError(AppError):
         super().__init__(f"The {integration} integration is not configured on this server.")
 
 
+class ForbiddenError(AppError):
+    """The caller is authenticated but not allowed to do this."""
+
+    status_code = 403
+    code = "forbidden"
+
+    def __init__(self, message: str = "You do not have permission to perform this action.") -> None:
+        super().__init__(message)
+
+
+class ConflictError(AppError):
+    """The request conflicts with existing data (e.g. a unique constraint)."""
+
+    status_code = 409
+    code = "conflict"
+
+
+class InvalidDataError(AppError):
+    """The database rejected the data (constraint or foreign-key violation)."""
+
+    status_code = 422
+    code = "invalid_data"
+
+
+class DatabaseError(AppError):
+    """An unexpected database failure. Details are logged, never returned."""
+
+    status_code = 500
+    code = "database_error"
+
+    def __init__(self, message: str = "A database error occurred.") -> None:
+        super().__init__(message)
+
+
 def _error_response(
     request: Request,
     status_code: int,

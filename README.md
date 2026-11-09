@@ -6,12 +6,13 @@ BrandGuard AI is an AI-powered brand-governance platform. It analyses content
 before publication against approved brand guidelines, terminology, facts and
 visual assets, while keeping humans in control of final approval.
 
-## Status: Part 01 - foundation and application shell
+## Status: Part 02A - database architecture and Supabase foundation (on top of Part 01)
 
 Built and honest about it:
 
 - React + TypeScript + Vite + Tailwind application shell with a Red & White design-token system.
 - Sidebar/top-bar layout, login and registration (real Supabase Auth when configured), dashboard, and every planned page.
+- Part 02A: organisations, profiles, memberships, invitations and audit-log schema with Row Level Security, plus backend authorisation utilities. Authentication verification is Part 02B. See [database schema](docs/DATABASE_SCHEMA.md) and [security model](docs/SECURITY_MODEL.md).
 - FastAPI backend foundation: configuration, CORS, structured errors, logging, `GET /health`, Supabase service module.
 
 **Not built yet** (pages show empty or "Coming soon" states, never fake data): knowledge hub, content submission,
@@ -60,3 +61,7 @@ Neither side needs real credentials to start.
 - [API](docs/API.md)
 - [Setup](docs/SETUP.md)
 - [Technical decisions](docs/DECISIONS.md)
+- [Database schema](docs/DATABASE_SCHEMA.md)
+- [Security model](docs/SECURITY_MODEL.md)
+- [Role permissions](docs/ROLE_PERMISSIONS.md)
+- [Migration guide](docs/MIGRATION_GUIDE.md)

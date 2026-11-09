@@ -1,0 +1,10 @@
+-- DESTRUCTIVE: permanently deletes every organisation, membership, invitation, profile
+-- and audit log. Take a backup first. Requires 0003_down/0004_down/0005_down applied.
+-- Uncomment to proceed.
+--
+-- drop table if exists public.audit_logs;
+-- drop table if exists public.organisation_invitations;
+-- drop table if exists public.organisation_memberships;
+-- drop table if exists public.profiles;
+-- drop table if exists public.organisations;
+-- drop function if exists private.set_updated_at();

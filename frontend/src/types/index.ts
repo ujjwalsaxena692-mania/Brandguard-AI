@@ -14,3 +14,5 @@ export interface CompliancePoint {
   label: string
   score: number
 }
+
+export * from './organisation'

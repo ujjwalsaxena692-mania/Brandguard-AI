@@ -72,6 +72,17 @@ class Settings(BaseModel):
             raise ValueError("SUPABASE_URL must start with https:// (or http:// for local dev)")
         return value.rstrip("/")
 
+    @field_validator("supabase_service_role_key")
+    @classmethod
+    def _validate_service_role_key(cls, value: SecretStr | None) -> SecretStr | None:
+        # A browser-safe key in the server slot (or vice versa) is a misconfiguration.
+        if value is not None and value.get_secret_value().startswith("sb_publishable_"):
+            raise ValueError(
+                "SUPABASE_SERVICE_ROLE_KEY looks like a publishable key; "
+                "use the server-side secret key"
+            )
+        return value
+
     @property
     def supabase_configured(self) -> bool:
         return bool(self.supabase_url and self.supabase_service_role_key)
