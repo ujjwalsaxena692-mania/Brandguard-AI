@@ -4,16 +4,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import get_app_settings
+from app.api.deps import get_app_settings, get_current_user
 from app.core.config import Settings
 from app.schemas.system import IntegrationsResponse
 from app.services.integrations import get_integration_statuses
 
-router = APIRouter(prefix="/system", tags=["system"])
+# Every route in this router requires a verified Supabase access token.
+router = APIRouter(prefix="/system", tags=["system"], dependencies=[Depends(get_current_user)])
 
 
-# NOTE: unauthenticated in Part 01 because no auth exists yet. Require an
-# authenticated admin before exposing this outside local development.
+# Authenticated users only. Restricting this to org admins comes with role permissions.
 @router.get(
     "/integrations",
     response_model=IntegrationsResponse,

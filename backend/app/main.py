@@ -16,6 +16,7 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.middleware.request_context import REQUEST_ID_HEADER, RequestContextMiddleware
 from app.schemas.errors import ErrorResponse
+from app.services.auth import TokenVerifier
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -36,6 +37,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         },
     )
     app.state.settings = settings
+    # No network access happens here; signing keys are fetched on the first authenticated request.
+    app.state.token_verifier = TokenVerifier(settings)
 
     # Added first => inner. RequestContext is added last => outermost.
     app.add_middleware(

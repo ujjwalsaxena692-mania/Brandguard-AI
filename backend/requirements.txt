@@ -12,3 +12,4 @@ uvicorn[standard]>=0.30
 pydantic>=2.7
 python-dotenv>=1.0
 supabase>=2.0
+PyJWT[crypto]>=2.8        # Supabase access-token (ES256) verification via JWKS

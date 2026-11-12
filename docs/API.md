@@ -53,4 +53,4 @@ It never returns secret values and never contacts the services, so `configured` 
 }
 ```
 
-Currently unauthenticated because no auth exists yet. Restrict it to authenticated admins before deploying.
+Requires `Authorization: Bearer <Supabase access token>` (HTTP 401 otherwise). Any signed-in user may call it for now; restrict it to org admins once role permissions exist.

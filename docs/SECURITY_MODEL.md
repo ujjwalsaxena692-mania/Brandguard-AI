@@ -69,7 +69,7 @@ your project's signing keys: verify tokens against the project's published JWKS
 - Not executed against PostgreSQL in the build environment; run the integration tests
   (see [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)) before trusting any of the above.
 - No rate limiting, email sending, or token generation yet (Part 02B).
-- `GET /api/v1/system/integrations` from Part 01 is still unauthenticated.
+- `GET /api/v1/system/integrations` requires a verified Supabase access token (ES256, verified against the project JWKS). It is not yet limited to org admins.
 - Audit logging is explicit (RPCs and backend), not trigger-based; direct role changes via
   the Data API are not automatically audited.
 - Hard-deleting an organisation (backend) also deletes its audit logs.
