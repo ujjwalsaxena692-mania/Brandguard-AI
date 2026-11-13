@@ -13,6 +13,7 @@ enabled (see [SECURITY_MODEL.md](SECURITY_MODEL.md)).
 | `0004_rls_policies.sql` | Privilege revocations/grants and all RLS policies |
 | `0005_auth_profile_sync.sql` | Profile-on-signup trigger and backfill |
 | `0006_organisation_functions.sql` | `create_organisation()` and `accept_invitation()` |
+| `0007_knowledge_documents.sql` | `knowledge_documents` table + private storage bucket |
 
 ## Relationships
 
@@ -107,6 +108,31 @@ tokens, but it cannot distinguish a 64-hex plaintext from a hash, so hash in the
 Indexes: `(organisation_id, created_at desc)`, `actor_id`, `(entity_type, entity_id)`.
 Append-only is enforced by privileges: clients have `SELECT` only. Deleting an
 organisation cascades to its audit logs.
+
+### `knowledge_documents`
+
+Approved brand-knowledge files (PDF, DOCX, TXT) for one organisation. Written only by the
+backend (service role) after a role check; members can `SELECT` their organisation's rows.
+
+| Column | Notes |
+| --- | --- |
+| `id` | uuid primary key |
+| `organisation_id` | FK -> organisations, cascade delete |
+| `uploaded_by` | FK -> auth.users, set null |
+| `original_filename` | sanitised display name (1-255 chars) |
+| `storage_path` | `<organisation_id>/<id>.<ext>` in bucket `knowledge-documents` (unique; must start with the organisation id) |
+| `mime_type`, `size_bytes` | one of the three allowed types; 1 byte to 10 MB |
+| `status` | `uploaded`, `processing`, `ready`, `failed` (`ready` requires `extracted_text`) |
+| `extracted_text`, `text_length` | the only copy of the extracted text |
+| `error_message` | short fixed reason when `failed` (max 500 chars) |
+| `processed_at`, `created_at`, `updated_at` | timestamps (`updated_at` maintained by trigger) |
+
+Indexes: `(organisation_id, created_at desc)`, `(uploaded_by)`. Policy: `knowledge_documents_select_member`
+(`private.is_org_member(organisation_id)`), `authenticated` only.
+
+**Storage bucket `knowledge-documents`:** private, 10 MB limit, PDF/DOCX/TXT only, created by the
+migration (Supabase only). It has no policies on `storage.objects` on purpose, so only the backend's
+service-role key can read or write objects. Never make it public and never add object policies.
 
 ## Functions
 

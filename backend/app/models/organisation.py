@@ -34,16 +34,23 @@ class Permission(str, Enum):
     MEMBERS_MANAGE_PRIVILEGED = "members:manage_privileged"  # admins/owners (owner only)
     INVITATIONS_MANAGE = "invitations:manage"
     AUDIT_LOG_VIEW = "audit:view"
+    KNOWLEDGE_VIEW = "knowledge:view"  # read approved brand knowledge documents (all roles)
+    KNOWLEDGE_MANAGE = "knowledge:manage"  # upload/delete them (owners and admins)
 
 
 _ALL = frozenset(Permission)
 
-# Content-workflow permissions (submit, review, approve) arrive with those features.
+# Knowledge Hub: every member can read; only owners/admins curate. Submission, review and approval
+# permissions arrive with those features.
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.OWNER: _ALL,
     Role.ADMIN: _ALL - {Permission.MEMBERS_MANAGE_PRIVILEGED},
-    Role.REVIEWER: frozenset({Permission.ORG_VIEW, Permission.MEMBERS_VIEW}),
-    Role.CREATOR: frozenset({Permission.ORG_VIEW, Permission.MEMBERS_VIEW}),
+    Role.REVIEWER: frozenset(
+        {Permission.ORG_VIEW, Permission.MEMBERS_VIEW, Permission.KNOWLEDGE_VIEW}
+    ),
+    Role.CREATOR: frozenset(
+        {Permission.ORG_VIEW, Permission.MEMBERS_VIEW, Permission.KNOWLEDGE_VIEW}
+    ),
 }
 
 # Roles an inviter may grant. 'owner' is never granted by invitation.

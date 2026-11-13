@@ -45,7 +45,12 @@ def test_admin_cannot_manage_privileged_members():
 
 def test_creator_and_reviewer_have_read_only_organisation_access():
     for role in (Role.CREATOR, Role.REVIEWER):
-        assert ROLE_PERMISSIONS[role] == {Permission.ORG_VIEW, Permission.MEMBERS_VIEW}
+        assert ROLE_PERMISSIONS[role] == {
+            Permission.ORG_VIEW,
+            Permission.MEMBERS_VIEW,
+            Permission.KNOWLEDGE_VIEW,
+        }
+        assert not has_permission(role, Permission.KNOWLEDGE_MANAGE)
         assert not has_permission(role, Permission.AUDIT_LOG_VIEW)
         assert not has_permission(role, Permission.INVITATIONS_MANAGE)
         assert not has_permission(role, Permission.MEMBERS_MANAGE)
@@ -83,3 +88,12 @@ def test_removal_rules():
     assert not can_remove_member(Role.ADMIN, Role.ADMIN, is_self=False)
     assert not can_remove_member(Role.ADMIN, Role.OWNER, is_self=False)
     assert can_remove_member(Role.OWNER, Role.ADMIN, is_self=False)
+
+
+def test_only_owners_and_admins_manage_knowledge_but_every_role_can_read_it():
+    for role in Role:
+        assert has_permission(role, Permission.KNOWLEDGE_VIEW)
+    assert has_permission(Role.OWNER, Permission.KNOWLEDGE_MANAGE)
+    assert has_permission(Role.ADMIN, Permission.KNOWLEDGE_MANAGE)
+    assert not has_permission(Role.REVIEWER, Permission.KNOWLEDGE_MANAGE)
+    assert not has_permission(Role.CREATOR, Permission.KNOWLEDGE_MANAGE)

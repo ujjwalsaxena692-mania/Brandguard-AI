@@ -74,3 +74,27 @@ verified token's user. Requires `Authorization: Bearer <Supabase access token>`.
 
 Backend routes use `Depends(require_permission(Permission.X))` (or `CurrentOrganisation`) from
 `app/api/deps.py` to get the verified `organisation_id` and `role`.
+
+### Knowledge Hub: `/api/v1/knowledge/documents`
+
+Approved brand-knowledge documents (PDF, DOCX, TXT; max 10 MB). All routes need a Bearer token and an
+active organisation membership (see `X-Organisation-Id` above); the organisation always comes from the
+verified token's membership, never from the request. Files live in a private bucket and are never exposed
+by URL; responses contain metadata and a short text preview only.
+
+| Method and path | Permission | Result |
+| --- | --- | --- |
+| `POST /` (multipart field `file`) | `knowledge:manage` (owner, admin) | `201` document with `text_preview` |
+| `GET /?limit=50&offset=0` (limit 1-100) | `knowledge:view` (all roles) | `200` `{items, limit, offset}`, newest first |
+| `GET /{document_id}` | `knowledge:view` | `200` document with `text_preview` (first 2000 chars) |
+| `DELETE /{document_id}` | `knowledge:manage` | `204` (object deleted, then the row) |
+
+Document fields: `id, original_filename, mime_type, size_bytes, status, text_length, error_message,
+uploaded_by, processed_at, created_at, updated_at`. `status` is `uploaded`, `processing`, `ready` or `failed`.
+
+Errors (structured as above): `400 empty_file` / `invalid_file` / `bad_request`, `413 file_too_large`,
+`415 unsupported_file_type` (extension, MIME type and content must all agree), `403 forbidden`,
+`404 not_found` (also for another organisation's document), `502 storage_unavailable`,
+`500 database_error`. A readable-looking file whose text cannot be extracted (corrupt, scanned/no text,
+password-protected) is **kept with `status: "failed"`** and a short `error_message`, so it can be seen and deleted.
+

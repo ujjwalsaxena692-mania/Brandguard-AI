@@ -172,8 +172,8 @@ def test_valid_membership_resolves_organisation_and_role_from_the_database():
 def test_context_endpoint_lists_exactly_the_roles_permissions():
     expected = {
         Role.OWNER: sorted(permission.value for permission in Permission),
-        Role.CREATOR: ["members:view", "org:view"],
-        Role.REVIEWER: ["members:view", "org:view"],
+        Role.CREATOR: ["knowledge:view", "members:view", "org:view"],
+        Role.REVIEWER: ["knowledge:view", "members:view", "org:view"],
     }
     for role, permissions in expected.items():
         client, _ = build([row(ORG_A, USER, role)])

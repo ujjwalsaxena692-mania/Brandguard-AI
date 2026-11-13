@@ -49,7 +49,7 @@ labelled preview mode. Production builds without them refuse to render the app.
 ## Supabase
 
 1. Create a project.
-2. Run `database/migrations/0001` to `0006` in order in the SQL editor (see [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)).
+2. Run `database/migrations/0001` to `0007` in order in the SQL editor (see [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)).
 3. Put the project URL and publishable key in `frontend/.env.local`; put the URL and service-role key in `backend/.env`.
 
 ## Scripts

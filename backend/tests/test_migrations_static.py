@@ -31,7 +31,7 @@ def _all_sql() -> str:
 def test_migrations_are_numbered_sequentially_without_gaps():
     numbers = [int(name[:4]) for name in _migrations()]
     assert numbers == list(range(1, len(numbers) + 1)), numbers
-    assert len(numbers) >= 6
+    assert len(numbers) >= 7
 
 
 def test_every_public_table_has_rls_enabled():
@@ -43,6 +43,7 @@ def test_every_public_table_has_rls_enabled():
         "organisation_memberships",
         "organisation_invitations",
         "audit_logs",
+        "knowledge_documents",
     }
     for table in tables:
         pattern = rf"alter table public\.{table}\s+enable row level security"
@@ -99,6 +100,25 @@ def test_policies_do_not_query_the_membership_table_directly():
         assert "from public.organisation_memberships" not in policy.lower()
 
 
+def test_knowledge_documents_are_org_isolated_read_only_and_bucket_is_private():
+    sql = _migrations()["0007_knowledge_documents.sql"]
+    lowered = sql.lower()
+    assert "organisation_id   uuid not null references public.organisations" in lowered
+    assert "enable row level security" in lowered
+    assert "revoke all on public.knowledge_documents from anon, authenticated" in lowered
+    # clients may only SELECT; there is no insert/update/delete grant or policy
+    assert re.findall(r"grant\s+(\w+)\s+on public\.knowledge_documents", lowered) == ["select"]
+    policies = re.findall(r"create policy .*?;", sql, flags=re.I | re.S)
+    assert len(policies) == 1
+    assert re.search(r"for select to authenticated", policies[0], flags=re.I)
+    assert "private.is_org_member(organisation_id)" in policies[0]
+    assert not re.search(r"(using|with check)\s*\(\s*true\s*\)", policies[0], flags=re.I)
+    # the bucket is private, size-limited, type-restricted, and never opened with policies
+    assert re.search(r"'knowledge-documents',\s*'knowledge-documents',\s*false,\s*10485760", lowered)
+    assert "public = false" in lowered
+    assert "storage.objects" not in lowered  # no policies on objects: server-side access only
+
+
 def test_no_plaintext_invitation_token_or_password_columns():
     sql = _migrations()["0002_core_tables.sql"].lower()
     assert "invitation_token_hash" in sql
@@ -113,7 +133,7 @@ def test_clients_cannot_write_audit_logs_or_insert_memberships():
 
 
 def test_each_schema_migration_has_a_rollback_script():
-    for number in range(2, 7):
+    for number in range(2, 8):
         assert list(ROLLBACK_DIR.glob(f"{number:04d}_down.sql")), number
 
 

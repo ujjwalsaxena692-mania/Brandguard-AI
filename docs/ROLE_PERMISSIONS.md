@@ -9,6 +9,9 @@ Content-workflow permissions (submitting, reviewing, approving content) are **no
 yet**; they arrive with those features. Today `reviewer` and `creator` differ from each
 other only in label.
 
+The Knowledge Hub adds two permissions: `knowledge:view` (every role) and `knowledge:manage`
+(owners and admins). The API enforces them; the database only lets members `SELECT` documents.
+
 ## Matrix (organisation administration)
 
 | Capability | owner | admin | reviewer | creator |
@@ -27,6 +30,8 @@ other only in label.
 | Leave the organisation | yes* | yes | yes | yes |
 | Read audit logs | yes | yes | no | no |
 | Write audit logs | backend only | backend only | no | no |
+| Read Knowledge Hub documents | yes | yes | yes | yes |
+| Upload / delete Knowledge Hub documents | yes | yes | no | no |
 
 \* The last active owner cannot leave, be demoted or be suspended.
 

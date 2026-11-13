@@ -3,7 +3,6 @@
 #
 # Deliberately NOT included yet (added by the module that needs them):
 #   anthropic            - AI analysis engine
-#   PyMuPDF, python-docx - document parsing
 #   pytesseract          - OCR (also needs the Tesseract system binary)
 #   embedding provider SDK - chosen separately
 
@@ -13,3 +12,6 @@ pydantic>=2.7
 python-dotenv>=1.0
 supabase>=2.0
 PyJWT[crypto]>=2.8        # Supabase access-token (ES256) verification via JWKS
+pypdf>=4.0                # Knowledge Hub: PDF text extraction
+python-docx>=1.1          # Knowledge Hub: DOCX text extraction
+python-multipart>=0.0.9   # Knowledge Hub: multipart file uploads (request.form())
