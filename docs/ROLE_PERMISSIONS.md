@@ -54,3 +54,4 @@ other only in label.
 | At least one owner; identity columns immutable | Trigger (0003) |
 | Create org / accept invitation | SECURITY DEFINER functions (0006) |
 | Same rules in Python | `app/models/organisation.py` |
+| Active membership + role for each API request | `get_organisation_context` / `require_permission` in `app/api/deps.py` (looks the caller up by verified user id; `X-Organisation-Id` only selects among their own memberships) |

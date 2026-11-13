@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api import health
+from app.api.deps import ORGANISATION_HEADER
 from app.api.v1.router import api_v1_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
@@ -17,6 +18,7 @@ from app.core.logging import configure_logging
 from app.middleware.request_context import REQUEST_ID_HEADER, RequestContextMiddleware
 from app.schemas.errors import ErrorResponse
 from app.services.auth import TokenVerifier
+from app.services.supabase_client import SupabaseService
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -39,6 +41,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     # No network access happens here; signing keys are fetched on the first authenticated request.
     app.state.token_verifier = TokenVerifier(settings)
+    # Server-side (service-role) client, created lazily on first use; unconfigured => HTTP 503.
+    app.state.supabase_service = SupabaseService(settings)
 
     # Added first => inner. RequestContext is added last => outermost.
     app.add_middleware(
@@ -46,7 +50,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=list(settings.allowed_origins),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", REQUEST_ID_HEADER],
+        allow_headers=["Authorization", "Content-Type", REQUEST_ID_HEADER, ORGANISATION_HEADER],
         expose_headers=[REQUEST_ID_HEADER],
     )
     app.add_middleware(RequestContextMiddleware)

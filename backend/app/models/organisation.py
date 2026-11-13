@@ -71,6 +71,31 @@ def has_permission(role: Role, permission: Permission) -> bool:
     return permission in ROLE_PERMISSIONS[role]
 
 
+class OrganisationContext(BaseModel):
+    """Who is calling and in which organisation, as proven by the database.
+
+    Built only from a verified, active ``Membership`` (see ``OrganisationAccessService
+    .resolve_membership``); never from request input.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    organisation_id: UUID
+    user_id: UUID
+    role: Role
+
+    @classmethod
+    def from_membership(cls, membership: Membership) -> OrganisationContext:
+        return cls(
+            organisation_id=membership.organisation_id,
+            user_id=membership.user_id,
+            role=membership.role,
+        )
+
+    def can(self, permission: Permission) -> bool:
+        return has_permission(self.role, permission)
+
+
 def can_set_member_role(actor: Role, current: Role, new: Role) -> bool:
     """May ``actor`` change a member from ``current`` to ``new``? (mirrors memberships_update)"""
     if actor is Role.OWNER:

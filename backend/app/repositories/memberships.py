@@ -31,6 +31,20 @@ class MembershipRepository:
         )
         return Membership.model_validate(rows[0]) if rows else None
 
+    def list_active_for_user(self, user_id: UUID) -> list[Membership]:
+        """The user's active memberships (suspended ones never match). At most 2 rows are
+        fetched: callers only need to know whether there is none, one, or several."""
+        rows = run_query(
+            "memberships.list_active_for_user",
+            lambda: self._client.table(_TABLE)
+            .select(_COLUMNS)
+            .eq("user_id", str(user_id))
+            .eq("status", "active")
+            .limit(2)
+            .execute(),
+        )
+        return [Membership.model_validate(row) for row in rows]
+
     def list_for_organisation(self, organisation_id: UUID) -> list[Membership]:
         rows = run_query(
             "memberships.list_for_organisation",
