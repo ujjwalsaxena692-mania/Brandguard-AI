@@ -15,6 +15,8 @@ TABLES = (
     "organisation_invitations",
     "audit_logs",
     "knowledge_documents",
+    "content_submissions",
+    "submission_attachments",
 )
 
 
@@ -45,7 +47,7 @@ def test_authenticated_cannot_insert_organisations_memberships_or_audit_logs(db)
 
 def test_all_policies_apply_to_authenticated_only(db):
     rows = db.rows("select policyname, roles::text[] from pg_policies where schemaname = 'public'")
-    assert len(rows) == 12  # 11 from 0004 + knowledge_documents_select_member (0007)
+    assert len(rows) == 14  # 11 from 0004, +1 knowledge (0007), +2 submissions and attachments (0008)
     for name, roles in rows:
         assert list(roles) == ["authenticated"], (name, roles)
 

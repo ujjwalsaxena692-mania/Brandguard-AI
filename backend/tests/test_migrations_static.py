@@ -31,7 +31,7 @@ def _all_sql() -> str:
 def test_migrations_are_numbered_sequentially_without_gaps():
     numbers = [int(name[:4]) for name in _migrations()]
     assert numbers == list(range(1, len(numbers) + 1)), numbers
-    assert len(numbers) >= 7
+    assert len(numbers) >= 8
 
 
 def test_every_public_table_has_rls_enabled():
@@ -44,6 +44,8 @@ def test_every_public_table_has_rls_enabled():
         "organisation_invitations",
         "audit_logs",
         "knowledge_documents",
+        "content_submissions",
+        "submission_attachments",
     }
     for table in tables:
         pattern = rf"alter table public\.{table}\s+enable row level security"
@@ -119,6 +121,35 @@ def test_knowledge_documents_are_org_isolated_read_only_and_bucket_is_private():
     assert "storage.objects" not in lowered  # no policies on objects: server-side access only
 
 
+def test_submissions_are_org_isolated_read_only_and_their_bucket_is_private():
+    sql = _migrations()["0008_content_submissions.sql"]
+    lowered = sql.lower()
+    for table in ("content_submissions", "submission_attachments"):
+        assert f"alter table public.{table} enable row level security" in lowered
+        assert f"revoke all on public.{table} from anon, authenticated" in lowered
+    # clients may only SELECT; there is no insert/update/delete grant or policy
+    grants = re.findall(r"grant\s+(\w+)\s+on public\.(\w+)", lowered)
+    assert sorted(grants) == [("select", "content_submissions"), ("select", "submission_attachments")]
+    policies = re.findall(r"create policy .*?;", sql, flags=re.I | re.S)
+    assert len(policies) == 2
+    for policy in policies:
+        assert re.search(r"for select to authenticated", policy, flags=re.I)
+        assert not re.search(r"(using|with check)\s*\(\s*true\s*\)", policy, flags=re.I)
+    # submissions: membership AND (author OR privileged role), via the existing helpers
+    assert "private.is_org_member(organisation_id)" in policies[0]
+    assert "private.has_org_role(organisation_id" in policies[0] and "auth.uid()" in policies[0]
+    # attachments can never reference a submission of another organisation
+    assert "foreign key (submission_id, organisation_id)" in lowered
+    assert "references public.content_submissions (id, organisation_id)" in lowered
+    # the attachment guard function is not SECURITY DEFINER and pins its search_path
+    assert "security definer" not in lowered
+    assert "set search_path = ''" in lowered
+    # the bucket is private, size-limited, type-restricted and never opened with policies
+    assert re.search(r"'submission-attachments',\s*'submission-attachments',\s*false,\s*10485760", lowered)
+    assert "public = false" in lowered
+    assert "storage.objects" not in lowered  # no policies on objects: server-side access only
+
+
 def test_no_plaintext_invitation_token_or_password_columns():
     sql = _migrations()["0002_core_tables.sql"].lower()
     assert "invitation_token_hash" in sql
@@ -133,7 +164,7 @@ def test_clients_cannot_write_audit_logs_or_insert_memberships():
 
 
 def test_each_schema_migration_has_a_rollback_script():
-    for number in range(2, 8):
+    for number in range(2, 9):
         assert list(ROLLBACK_DIR.glob(f"{number:04d}_down.sql")), number
 
 

@@ -33,6 +33,8 @@ REQUIRED_TABLES = {
     "organisation_invitations",
     "audit_logs",
     "knowledge_documents",
+    "content_submissions",
+    "submission_attachments",
 }
 
 
@@ -170,7 +172,7 @@ def _assert_migrations_applied(db: Db) -> None:
     missing = REQUIRED_TABLES - tables
     if missing:
         pytest.fail(
-            f"Migrations 0002-0007 are not applied to the test database (missing: {sorted(missing)}). "
+            f"Migrations 0002-0008 are not applied to the test database (missing: {sorted(missing)}). "
             "See docs/MIGRATION_GUIDE.md.",
             pytrace=False,
         )

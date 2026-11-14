@@ -11,6 +11,7 @@ import io
 import logging
 import re
 import zipfile
+from dataclasses import dataclass
 
 logger = logging.getLogger("brandguard.knowledge")
 
@@ -18,6 +19,8 @@ MAX_PDF_PAGES = 500
 MAX_DOCX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024  # guards against zip bombs
 MAX_DOCX_ENTRIES = 5000
 
+PROCESSING_FAILED = "The document could not be processed."
+TOO_MUCH_TEXT = "The document contains too much text to process."
 _UNREADABLE = "The document could not be read. It may be corrupt."
 _NO_TEXT = "No extractable text was found in the document."
 
@@ -123,3 +126,27 @@ def extract_text(extension: str, data: bytes) -> str:
     if not text:
         raise ExtractionError(_NO_TEXT)
     return text
+
+
+@dataclass(frozen=True)
+class ExtractionOutcome:
+    """Exactly one of ``text`` / ``failure`` is set. ``failure`` is a short, user-safe reason."""
+
+    text: str | None = None
+    failure: str | None = None
+
+
+def extract_for_storage(extension: str, data: bytes, *, max_chars: int) -> ExtractionOutcome:
+    """``extract_text`` plus the rules both Knowledge Hub documents and submission attachments
+    share: text over ``max_chars`` is refused, and any unexpected parser error becomes a generic
+    failure (logged by type only) instead of a 500."""
+    try:
+        text = extract_text(extension, data)
+    except ExtractionError as exc:
+        return ExtractionOutcome(failure=exc.reason)
+    except Exception as exc:  # defensive: a parser bug must not become a server error
+        logger.error("Unexpected extraction error (%s).", type(exc).__name__)
+        return ExtractionOutcome(failure=PROCESSING_FAILED)
+    if len(text) > max_chars:
+        return ExtractionOutcome(failure=TOO_MUCH_TEXT)
+    return ExtractionOutcome(text=text)

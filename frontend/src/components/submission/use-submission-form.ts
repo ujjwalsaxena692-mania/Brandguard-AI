@@ -1,17 +1,30 @@
 import { useCallback, useMemo, useState } from 'react'
-import { EMPTY_VALUES, isFormDirty, toAttachmentMeta, validateFile, type SubmissionErrors } from '@/lib/submission'
-import type { ContentSubmission, FormAttachment, SubmissionFormValues } from '@/types/submission'
+import { detailToValues } from '@/lib/content-submission'
+import { EMPTY_VALUES, isFormDirty, validateFile, type SubmissionErrors } from '@/lib/submission'
+import type { ApiAttachment, ApiSubmissionDetail } from '@/types/content-submission'
+import type { SubmissionFormValues } from '@/types/submission'
 
-let attachmentCounter = 0
-const nextAttachmentId = () => {
-  attachmentCounter += 1
-  return `att-${Date.now().toString(36)}-${attachmentCounter}`
+/** A file the user picked that has not been sent to the server yet. */
+export interface PendingFile {
+  id: string
+  file: File
 }
 
-/** All state for the submission form. Values are kept as typed, so failed validation never loses content. */
+let pendingCounter = 0
+const nextPendingId = () => {
+  pendingCounter += 1
+  return `pending-${Date.now().toString(36)}-${pendingCounter}`
+}
+
+/**
+ * All state for the submission form. Values are kept as typed, so failed validation or a failed
+ * request never loses content. `saved` are attachments already on the server draft; `pending`
+ * are selected files that upload when the draft is saved or submitted.
+ */
 export function useSubmissionForm() {
   const [values, setValues] = useState<SubmissionFormValues>(EMPTY_VALUES)
-  const [attachments, setAttachments] = useState<FormAttachment[]>([])
+  const [pending, setPending] = useState<PendingFile[]>([])
+  const [saved, setSaved] = useState<ApiAttachment[]>([])
   const [errors, setErrors] = useState<SubmissionErrors>({})
   const [draftId, setDraftId] = useState<string | null>(null)
 
@@ -24,54 +37,68 @@ export function useSubmissionForm() {
   const addFiles = useCallback(
     (files: File[]): string[] => {
       const problems: string[] = []
-      const accepted: FormAttachment[] = []
+      const accepted: PendingFile[] = []
       for (const file of files) {
-        const known = [...attachments, ...accepted].map((item) => ({ name: item.meta.name, size: item.meta.size }))
+        const known = [
+          ...saved.map((item) => ({ name: item.original_filename, size: item.size_bytes })),
+          ...pending.map((item) => ({ name: item.file.name, size: item.file.size })),
+          ...accepted.map((item) => ({ name: item.file.name, size: item.file.size })),
+        ]
         const problem = validateFile(file, known)
         if (problem) problems.push(problem)
-        else accepted.push({ id: nextAttachmentId(), meta: toAttachmentMeta(file), file })
+        else accepted.push({ id: nextPendingId(), file })
       }
       if (accepted.length > 0) {
-        setAttachments((previous) => [...previous, ...accepted])
+        setPending((previous) => [...previous, ...accepted])
         setErrors((previous) => (previous.attachments ? { ...previous, attachments: undefined } : previous))
       }
       return problems
     },
-    [attachments],
+    [saved, pending],
   )
 
-  const removeAttachment = useCallback((id: string) => {
-    setAttachments((previous) => previous.filter((item) => item.id !== id))
-    setErrors((previous) => (previous.attachments ? { ...previous, attachments: undefined } : previous))
+  const removePending = useCallback((id: string) => {
+    setPending((previous) => previous.filter((item) => item.id !== id))
   }, [])
 
   const reset = useCallback(() => {
     setValues(EMPTY_VALUES)
-    setAttachments([])
+    setPending([])
+    setSaved([])
     setErrors({})
     setDraftId(null)
   }, [])
 
-  const loadDraft = useCallback((record: ContentSubmission) => {
-    setValues({
-      title: record.title,
-      contentType: record.contentType ?? '',
-      contentText: record.contentText,
-      campaignName: record.campaignName,
-      targetAudience: record.targetAudience,
-      platform: record.platform,
-      publishingDate: record.publishingDate,
-      reviewerContext: record.reviewerContext,
-    })
-    // Only metadata is stored, so reopened attachments have no file until the user re-attaches them.
-    setAttachments(record.attachments.map((meta) => ({ id: nextAttachmentId(), meta, file: null })))
+  const loadDraft = useCallback((detail: ApiSubmissionDetail) => {
+    setValues(detailToValues(detail))
+    setSaved(detail.attachments)
+    setPending([])
     setErrors({})
-    setDraftId(record.id)
+    setDraftId(detail.id)
   }, [])
 
-  const isDirty = useMemo(() => isFormDirty(values, attachments.length), [values, attachments.length])
+  const isDirty = useMemo(
+    () => isFormDirty(values, pending.length + saved.length),
+    [values, pending.length, saved.length],
+  )
 
-  return { values, attachments, errors, setErrors, draftId, setDraftId, setField, addFiles, removeAttachment, reset, loadDraft, isDirty }
+  return {
+    values,
+    pending,
+    saved,
+    errors,
+    draftId,
+    setErrors,
+    setDraftId,
+    setPending,
+    setSaved,
+    setField,
+    addFiles,
+    removePending,
+    reset,
+    loadDraft,
+    isDirty,
+  }
 }
 
 export type SubmissionFormApi = ReturnType<typeof useSubmissionForm>

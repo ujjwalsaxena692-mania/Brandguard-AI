@@ -300,7 +300,9 @@ def test_unexpected_parser_error_becomes_a_generic_failure_without_leaking_detai
     def explode(extension, data):
         raise ValueError("secret detail from /etc/passwd")
 
-    monkeypatch.setattr(knowledge_module, "extract_text", explode)
+    from app.services import text_extraction
+
+    monkeypatch.setattr(text_extraction, "extract_text", explode)
     record = upload(service_for(FakeSupabase()), b"hello")
     assert record.status is DocumentStatus.FAILED
     assert record.error_message == "The document could not be processed."

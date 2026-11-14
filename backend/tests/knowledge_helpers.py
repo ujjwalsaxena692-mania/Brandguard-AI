@@ -27,9 +27,12 @@ class FakeQuery:
         self._order: tuple[str, bool] | None = None
         self._range: tuple[int, int] | None = None
         self._limit: int | None = None
+        self._count: str | None = None
+        self._like: list[tuple[str, str]] = []
+        self._in: list[tuple[str, list[str]]] = []
 
-    def select(self, columns: str = "*"):
-        self._op, self._columns = "select", columns
+    def select(self, columns: str = "*", count: str | None = None):
+        self._op, self._columns, self._count = "select", columns, count
         self._c.selects.append((self._table, columns))
         return self
 
@@ -50,6 +53,15 @@ class FakeQuery:
         self._c.filters.append((self._table, self._op, column, value))
         return self
 
+    def ilike(self, column: str, pattern: str):
+        self._like.append((column, pattern))
+        return self
+
+    def in_(self, column: str, values: list[str]):
+        self._in.append((column, list(values)))
+        self._c.filters.append((self._table, self._op, column, ",".join(sorted(values))))
+        return self
+
     def order(self, column: str, desc: bool = False):
         self._order = (column, desc)
         return self
@@ -64,7 +76,18 @@ class FakeQuery:
 
     def _matching(self) -> list[dict]:
         rows = self._c.tables.setdefault(self._table, [])
-        return [r for r in rows if all(str(r.get(c)) == v for c, v in self._filters)]
+        def like(row: dict, column: str, pattern: str) -> bool:
+            needle = pattern[1:-1]  # the repository always builds %<text>%
+            needle = needle.replace(r"\%", "%").replace(r"\_", "_").replace("\\\\", "\\")
+            return needle.lower() in str(row.get(column) or "").lower()
+
+        return [
+            r
+            for r in rows
+            if all(str(r.get(c)) == v for c, v in self._filters)
+            and all(like(r, c, p) for c, p in self._like)
+            and all(str(r.get(c)) in vals for c, vals in self._in)
+        ]
 
     def execute(self):
         failure_key = self._op
@@ -74,10 +97,22 @@ class FakeQuery:
             raise self._c.fail[failure_key]
 
         if self._op == "insert":
+            if self._table == "submission_attachments":
+                parents = [
+                    r
+                    for r in self._c.tables.get("content_submissions", [])
+                    if r["id"] == self._payload["submission_id"]
+                    and r["organisation_id"] == self._payload["organisation_id"]
+                    and r["status"] == "draft"
+                ]
+                if not parents:  # mirrors the private.guard_attachment_parent() trigger
+                    raise PgError("23514", "attachments can only be added to draft submissions")
             row = self._c.new_row(self._table, self._payload)
             self._c.tables.setdefault(self._table, []).append(row)
-            if self._table == "knowledge_documents":
+            if self._table in ("knowledge_documents", "submission_attachments"):
                 self._c.status_log.append(row["status"])
+            if self._table == "content_submissions":
+                self._c.submission_log.append(row["status"])
             return SimpleNamespace(data=[dict(row)])
 
         matched = self._matching()
@@ -85,15 +120,21 @@ class FakeQuery:
             for row in matched:
                 row.update(self._payload)
                 row["updated_at"] = self._c.now().isoformat()
-                if self._table == "knowledge_documents" and "status" in self._payload:
+                if self._table in ("knowledge_documents", "submission_attachments") and "status" in self._payload:
                     self._c.status_log.append(row["status"])
+                if self._table == "content_submissions" and "status" in self._payload:
+                    self._c.submission_log.append(row["status"])
             return SimpleNamespace(data=[dict(r) for r in matched])
         if self._op == "delete":
             rows = self._c.tables.setdefault(self._table, [])
             for row in matched:
                 rows.remove(row)
+                if self._table == "content_submissions":  # ON DELETE CASCADE to attachments
+                    children = self._c.tables.get("submission_attachments", [])
+                    children[:] = [c for c in children if c["submission_id"] != row["id"]]
             return SimpleNamespace(data=[dict(r) for r in matched])
 
+        total = len(matched)
         if self._order:
             matched.sort(key=lambda r: r[self._order[0]], reverse=self._order[1])
         if self._range:
@@ -103,7 +144,17 @@ class FakeQuery:
         if self._columns != "*":
             wanted = [c.strip() for c in self._columns.split(",")]
             matched = [{c: r.get(c) for c in wanted} for r in matched]
-        return SimpleNamespace(data=[dict(r) for r in matched])
+        return SimpleNamespace(
+            data=[dict(r) for r in matched], count=total if self._count else None
+        )
+
+
+class PgError(Exception):
+    """Looks like a driver error carrying a SQLSTATE (translated by repositories.base)."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class FakeBucket:
@@ -136,6 +187,7 @@ class FakeSupabase:
         self.filters: list[tuple[str, str, str, str]] = []
         self.selects: list[tuple[str, str]] = []
         self.status_log: list[str] = []
+        self.submission_log: list[str] = []
         self.fail: dict[str, Exception] = {}  # "insert" | "delete" | "select" | "update:<status>"
         self.fail_upload: Exception | None = None
         self.fail_remove: Exception | None = None
@@ -148,7 +200,19 @@ class FakeSupabase:
 
     def new_row(self, table: str, payload: dict) -> dict:
         row = dict(payload)
-        if table == "knowledge_documents":
+        if table == "content_submissions":
+            stamp = self.now().isoformat()
+            row.setdefault("id", str(uuid4()))
+            defaults = {
+                "content_type": None, "content_text": "", "campaign_name": None,
+                "target_audience": None, "platform": None, "publishing_date": None,
+                "reviewer_context": None, "error_message": None, "submitted_at": None,
+                "processed_at": None, "analysis_text_length": None,
+            }
+            for key, value in defaults.items():
+                row.setdefault(key, value)
+            row.update({"created_at": stamp, "updated_at": stamp})
+        if table in ("knowledge_documents", "submission_attachments"):
             stamp = self.now().isoformat()
             row.setdefault("id", str(uuid4()))
             row.update(
@@ -190,6 +254,71 @@ class FakeSupabase:
         self.tables.setdefault("knowledge_documents", []).append(row)
         self.objects[path] = text.encode()
         return row
+
+
+def add_submission(
+    client: FakeSupabase,
+    organisation_id,
+    author,
+    *,
+    status: str = "draft",
+    title: str = "Autumn launch email",
+    content_type: str | None = "email_newsletter",
+    content_text: str = "Meet Orbit Insights: reporting that finally makes sense.",
+    **extra,
+) -> dict:
+    """Seed a submission directly (as if created earlier)."""
+    stamp = client.now().isoformat()
+    row = {
+        "id": str(uuid4()),
+        "organisation_id": str(organisation_id),
+        "submitted_by": str(author),
+        "title": title,
+        "content_type": content_type,
+        "content_text": content_text,
+        "campaign_name": None,
+        "target_audience": None,
+        "platform": None,
+        "publishing_date": None,
+        "reviewer_context": None,
+        "status": status,
+        "error_message": None,
+        "submitted_at": stamp if status not in ("draft", "cancelled") else None,
+        "processed_at": None,
+        "analysis_text_length": None,
+        "created_at": stamp,
+        "updated_at": stamp,
+    }
+    row.update(extra)
+    client.tables.setdefault("content_submissions", []).append(row)
+    return row
+
+
+def add_attachment(client: FakeSupabase, submission: dict, *, status="ready", text="attached text") -> dict:
+    """Seed an attachment (and its stored object) on a seeded submission."""
+    att_id = uuid4()
+    path = f"{submission['organisation_id']}/{submission['id']}/{att_id}.txt"
+    stamp = client.now().isoformat()
+    row = {
+        "id": str(att_id),
+        "submission_id": submission["id"],
+        "organisation_id": submission["organisation_id"],
+        "uploaded_by": submission["submitted_by"],
+        "original_filename": "notes.txt",
+        "storage_path": path,
+        "mime_type": "text/plain",
+        "size_bytes": len(text),
+        "status": status,
+        "extracted_text": text if status == "ready" else None,
+        "text_length": len(text) if status == "ready" else None,
+        "error_message": "The document could not be read. It may be corrupt." if status == "failed" else None,
+        "processed_at": stamp,
+        "created_at": stamp,
+        "updated_at": stamp,
+    }
+    client.tables.setdefault("submission_attachments", []).append(row)
+    client.objects[path] = text.encode()
+    return row
 
 
 def membership_row(org, user, role: str, status: str = "active") -> dict:

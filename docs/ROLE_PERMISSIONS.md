@@ -9,6 +9,11 @@ Content-workflow permissions (submitting, reviewing, approving content) are **no
 yet**; they arrive with those features. Today `reviewer` and `creator` differ from each
 other only in label.
 
+Submissions add three: `submissions:create` (owner, admin, creator; reviewers cannot submit), `submissions:view_all`
+(owner, admin, reviewer; creators see only their own) and `submissions:manage_all` (owner, admin; act on other
+members' submissions). Authors can always change their own drafts. Ownership is enforced by the API (a submission
+you may not see is a 404); the database mirrors the read rule with RLS.
+
 The Knowledge Hub adds two permissions: `knowledge:view` (every role) and `knowledge:manage`
 (owners and admins). The API enforces them; the database only lets members `SELECT` documents.
 
@@ -32,6 +37,9 @@ The Knowledge Hub adds two permissions: `knowledge:view` (every role) and `knowl
 | Write audit logs | backend only | backend only | no | no |
 | Read Knowledge Hub documents | yes | yes | yes | yes |
 | Upload / delete Knowledge Hub documents | yes | yes | no | no |
+| Create and submit content | yes | yes | no | yes (own) |
+| See all submissions in the organisation | yes | yes | yes | own only |
+| Change or cancel others' submissions | yes | yes | no | no |
 
 \* The last active owner cannot leave, be demoted or be suspended.
 

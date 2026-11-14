@@ -14,6 +14,7 @@ enabled (see [SECURITY_MODEL.md](SECURITY_MODEL.md)).
 | `0005_auth_profile_sync.sql` | Profile-on-signup trigger and backfill |
 | `0006_organisation_functions.sql` | `create_organisation()` and `accept_invitation()` |
 | `0007_knowledge_documents.sql` | `knowledge_documents` table + private storage bucket |
+| `0008_content_submissions.sql` | `content_submissions`, `submission_attachments` + private storage bucket |
 
 ## Relationships
 
@@ -133,6 +134,26 @@ Indexes: `(organisation_id, created_at desc)`, `(uploaded_by)`. Policy: `knowled
 **Storage bucket `knowledge-documents`:** private, 10 MB limit, PDF/DOCX/TXT only, created by the
 migration (Supabase only). It has no policies on `storage.objects` on purpose, so only the backend's
 service-role key can read or write objects. Never make it public and never add object policies.
+
+### `content_submissions` and `submission_attachments`
+
+Content submitted for brand review. Written only by the backend (service role) after role and ownership checks;
+clients may `SELECT` (RLS): own submissions, or every submission in the organisation for owners, admins and reviewers.
+
+`content_submissions`: `id`, `organisation_id` (cascade), `submitted_by` (set null), `title` (3-120), `content_type`
+(9 values, nullable), `content_text` (max 20,000), `campaign_name`, `target_audience`, `platform`, `publishing_date`,
+`reviewer_context`, `status` (`draft`, `submitted`, `processing`, `ready_for_analysis`, `failed`, `cancelled`),
+`error_message`, `submitted_at`, `processed_at`, `analysis_text_length`, timestamps. CHECKs make later stages carry their
+data (submitted needs `submitted_at`, ready needs `analysis_text_length`, failed needs a reason). `unique (id, organisation_id)`.
+Indexes: `(organisation_id, created_at desc)`, `(organisation_id, status, created_at desc)`, `(organisation_id, submitted_by, created_at desc)`.
+
+`submission_attachments`: same shape as `knowledge_documents` plus `submission_id`; the composite foreign key
+`(submission_id, organisation_id)` makes cross-organisation attachments impossible, and `storage_path` must start with
+`<organisation_id>/<submission_id>/`. A trigger (`private.guard_attachment_parent`) allows inserts only while the
+submission is a `draft`. Policy `submission_attachments_select` is visible exactly when the parent submission is.
+
+**Storage bucket `submission-attachments`:** private, 10 MB, PDF/DOCX/TXT only, deliberately separate from the approved
+`knowledge-documents` bucket, with no policies on `storage.objects` (backend service-role access only).
 
 ## Functions
 

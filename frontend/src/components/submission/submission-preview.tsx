@@ -3,11 +3,14 @@ import { CheckCircle2, Circle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/components/dashboard/format'
 import { CONTENT_TYPE_LABELS, LIMITS, countWords } from '@/lib/submission'
-import type { FormAttachment, SubmissionFormValues } from '@/types/submission'
+import type { ApiAttachment } from '@/types/content-submission'
+import type { SubmissionFormValues } from '@/types/submission'
+import type { PendingFile } from './use-submission-form'
 
 interface SubmissionPreviewProps {
   values: SubmissionFormValues
-  attachments: FormAttachment[]
+  pending: PendingFile[]
+  saved: ApiAttachment[]
   draftId: string | null
 }
 
@@ -31,11 +34,14 @@ function Check({ done, label }: { done: boolean; label: string }) {
   )
 }
 
-export function SubmissionPreview({ values, attachments, draftId }: SubmissionPreviewProps) {
+export function SubmissionPreview({ values, pending, saved, draftId }: SubmissionPreviewProps) {
   const words = countWords(values.contentText)
   const text = values.contentText.trim()
-  const missingFiles = attachments.filter((item) => item.file === null).length
   const dash = <span className="font-normal text-muted-foreground">Not set</span>
+  const readableAttachments = saved.filter((item) => item.status === 'ready').length + pending.length
+  const failedAttachments = saved.filter((item) => item.status === 'failed').length
+  const textOk =
+    values.contentText.length <= LIMITS.contentMax && (text.length >= LIMITS.contentMin || readableAttachments > 0)
 
   return (
     <Card>
@@ -53,14 +59,15 @@ export function SubmissionPreview({ values, attachments, draftId }: SubmissionPr
           <Row label="Content type">{values.contentType ? CONTENT_TYPE_LABELS[values.contentType] : dash}</Row>
           <Row label="Word count">{words.toLocaleString()}</Row>
           <Row label="Attached files">
-            {attachments.length}
-            {missingFiles > 0 && <span className="font-normal text-muted-foreground"> ({missingFiles} to re-attach)</span>}
+            {saved.length + pending.length}
+            {pending.length > 0 && <span className="font-normal text-muted-foreground"> ({pending.length} upload on save)</span>}
+            {failedAttachments > 0 && <span className="font-normal text-destructive"> ({failedAttachments} unreadable)</span>}
           </Row>
           <Row label="Campaign">{values.campaignName.trim() || dash}</Row>
           <Row label="Target audience">{values.targetAudience.trim() || dash}</Row>
           <Row label="Platform">{values.platform || dash}</Row>
           <Row label="Publishing date">{values.publishingDate ? formatDate(values.publishingDate) : dash}</Row>
-          <Row label="Status">{draftId ? `Draft (${draftId})` : 'Not yet saved'}</Row>
+          <Row label="Status">{draftId ? 'Saved draft' : 'Not yet saved'}</Row>
         </dl>
 
         <div className="border-t border-border pt-4">
@@ -68,7 +75,8 @@ export function SubmissionPreview({ values, attachments, draftId }: SubmissionPr
           <ul className="space-y-1.5">
             <Check done={values.title.trim().length >= LIMITS.titleMin} label="Content title" />
             <Check done={values.contentType !== ''} label="Content type" />
-            <Check done={text.length >= LIMITS.contentMin && values.contentText.length <= LIMITS.contentMax} label="Content text" />
+            <Check done={textOk} label="Content text or a readable document" />
+            <Check done={failedAttachments === 0} label="No unreadable attachments" />
           </ul>
         </div>
       </CardContent>

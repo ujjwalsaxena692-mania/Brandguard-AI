@@ -26,12 +26,9 @@ from app.models.organisation import OrganisationContext
 from app.repositories.knowledge_documents import KnowledgeDocumentRepository
 from app.services.knowledge_files import validate_upload
 from app.services.knowledge_storage import KnowledgeStorage
-from app.services.text_extraction import ExtractionError, extract_text
+from app.services.text_extraction import PROCESSING_FAILED, extract_for_storage
 
 logger = logging.getLogger("brandguard.knowledge")
-
-_PROCESSING_FAILED = "The document could not be processed."
-_TOO_MUCH_TEXT = "The document contains too much text to process."
 
 
 class KnowledgeService:
@@ -80,17 +77,8 @@ class KnowledgeService:
         try:
             self._repository.mark_processing(organisation_id, document_id)
 
-            failure: str | None = None
-            text = ""
-            try:
-                text = extract_text(extension, data)
-                if len(text) > MAX_EXTRACTED_CHARS:
-                    failure = _TOO_MUCH_TEXT
-            except ExtractionError as exc:
-                failure = exc.reason
-            except Exception as exc:  # defensive: a parser bug must not become a 500
-                logger.error("Unexpected extraction error (%s).", type(exc).__name__)
-                failure = _PROCESSING_FAILED
+            outcome = extract_for_storage(extension, data, max_chars=MAX_EXTRACTED_CHARS)
+            failure, text = outcome.failure, outcome.text or ""
 
             if failure is not None:
                 updated = self._repository.mark_failed(organisation_id, document_id, failure)
@@ -142,6 +130,6 @@ class KnowledgeService:
 
     def _fail_quietly(self, organisation_id: UUID, document_id: UUID) -> None:
         try:
-            self._repository.mark_failed(organisation_id, document_id, _PROCESSING_FAILED)
+            self._repository.mark_failed(organisation_id, document_id, PROCESSING_FAILED)
         except Exception:
             logger.error("Could not mark a document as failed after a database error.")

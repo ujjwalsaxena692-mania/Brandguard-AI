@@ -12,6 +12,7 @@ role, pasting the whole file into *SQL Editor -> New query -> Run*:
 5. `0005_auth_profile_sync.sql`
 6. `0006_organisation_functions.sql`
 7. `0007_knowledge_documents.sql` (table, RLS and the private `knowledge-documents` storage bucket)
+8. `0008_content_submissions.sql` (submissions + attachments, RLS, draft-only trigger and the private `submission-attachments` bucket)
 
 Each file stops with an error on failure; fix it before running the next. Files are written
 to be re-runnable (`IF NOT EXISTS`, `CREATE OR REPLACE`, `DROP POLICY IF EXISTS`), but
@@ -26,13 +27,13 @@ from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and relkind = 'r'
 order by relname;
 
--- expect 12 policies (11 + knowledge_documents_select_member), all for role {authenticated}
+-- expect 14 policies (11 + knowledge_documents_select_member + content_submissions_select + submission_attachments_select), all for role {authenticated}
 select tablename, policyname, roles from pg_policies where schemaname = 'public' order by 1, 2;
 
 -- expect false for every row (anon must have no table access)
 select t, has_table_privilege('anon', 'public.' || t, 'select') as anon_can_read
 from unnest(array['organisations','profiles','organisation_memberships',
-                  'organisation_invitations','audit_logs','knowledge_documents']) t;
+                  'organisation_invitations','audit_logs','knowledge_documents','content_submissions','submission_attachments']) t;
 
 -- sign-up trigger present
 select tgname, tgenabled from pg_trigger where tgname = 'on_auth_user_created';

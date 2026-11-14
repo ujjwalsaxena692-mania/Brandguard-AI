@@ -1,12 +1,6 @@
 import { extensionOf, formatBytes } from '@/lib/files'
 import { todayISO } from '@/lib/knowledge'
-import type {
-  AttachmentMeta,
-  ContentSubmission,
-  ContentType,
-  FormAttachment,
-  SubmissionFormValues,
-} from '@/types/submission'
+import type { ContentType, SubmissionFormValues } from '@/types/submission'
 
 export const CONTENT_TYPES: readonly { value: ContentType; label: string }[] = [
   { value: 'social_post', label: 'Social Media Post' },
@@ -51,16 +45,14 @@ export const LIMITS = {
   maxFiles: 5,
 } as const
 
+/** Only the formats the server can validate and read (same as the Knowledge Hub). */
 export const ALLOWED_FILE_TYPES: Record<string, string> = {
   pdf: 'PDF document',
   docx: 'Word document (DOCX)',
   txt: 'Plain text (TXT)',
-  png: 'PNG image',
-  jpg: 'JPEG image',
-  jpeg: 'JPEG image',
 }
 
-export const FILE_ACCEPT = '.pdf,.docx,.txt,.png,.jpg,.jpeg'
+export const FILE_ACCEPT = '.pdf,.docx,.txt'
 
 export const EMPTY_VALUES: SubmissionFormValues = {
   title: '',
@@ -78,15 +70,10 @@ export function countWords(text: string): number {
   return trimmed ? trimmed.split(/\s+/).length : 0
 }
 
-export function toAttachmentMeta(file: File): AttachmentMeta {
-  const extension = extensionOf(file.name)
-  return { name: file.name, size: file.size, mimeType: file.type || 'unknown', extension }
-}
-
 /** Returns a message when the file cannot be added, otherwise null. */
 export function validateFile(file: File, existing: readonly { name: string; size: number }[]): string | null {
   if (!(extensionOf(file.name) in ALLOWED_FILE_TYPES)) {
-    return `“${file.name}” is not a supported type. Use PDF, DOCX, TXT, PNG or JPG.`
+    return `“${file.name}” is not a supported type. Use PDF, DOCX or TXT.`
   }
   if (file.size === 0) return `“${file.name}” is empty.`
   if (file.size > LIMITS.fileMaxBytes) {
@@ -136,33 +123,30 @@ export function validateDraft(values: SubmissionFormValues): SubmissionErrors {
   return errors
 }
 
-export function validateSubmission(values: SubmissionFormValues, attachments: readonly FormAttachment[]): SubmissionErrors {
+/**
+ * Mirrors the server rules (which re-check everything): a title, a content type, and either at
+ * least `contentMin` characters of text or at least one attached document to read.
+ */
+export function validateSubmission(values: SubmissionFormValues, attachmentCount: number): SubmissionErrors {
   const errors: SubmissionErrors = {}
   validateTitle(values, errors)
 
   if (!values.contentType) errors.contentType = 'Choose a content type.'
 
   const text = values.contentText.trim()
-  if (!text) errors.contentText = 'Enter the content you want reviewed.'
-  else if (text.length < LIMITS.contentMin) {
-    errors.contentText = `Add a little more: at least ${LIMITS.contentMin} characters are needed for a meaningful review (currently ${text.length}).`
-  } else if (values.contentText.length > LIMITS.contentMax) {
+  if (values.contentText.length > LIMITS.contentMax) {
     errors.contentText = `The content is ${values.contentText.length.toLocaleString()} characters. The limit is ${LIMITS.contentMax.toLocaleString()}.`
+  } else if (attachmentCount === 0) {
+    if (!text) errors.contentText = 'Enter the content you want reviewed, or attach a document.'
+    else if (text.length < LIMITS.contentMin) {
+      errors.contentText = `Add a little more: at least ${LIMITS.contentMin} characters are needed for a meaningful review (currently ${text.length}).`
+    }
   }
 
   validateOptional(values, errors)
-
-  const missing = attachments.filter((attachment) => attachment.file === null)
-  if (missing.length > 0) {
-    errors.attachments = `Re-attach or remove ${missing.map((item) => `“${item.meta.name}”`).join(', ')} before submitting. Files are not kept in saved drafts.`
-  }
   return errors
 }
 
 export function isFormDirty(values: SubmissionFormValues, attachmentCount: number): boolean {
   return attachmentCount > 0 || Object.values(values).some((value) => value.trim() !== '')
-}
-
-export function submissionStatusLabel(status: ContentSubmission['status']): string {
-  return status === 'submitted' ? 'Submitted — awaiting analysis' : 'Draft'
 }

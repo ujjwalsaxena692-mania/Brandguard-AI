@@ -43,14 +43,14 @@ def test_admin_cannot_manage_privileged_members():
     assert not has_permission(Role.ADMIN, Permission.MEMBERS_MANAGE_PRIVILEGED)
 
 
-def test_creator_and_reviewer_have_read_only_organisation_access():
+def test_creator_and_reviewer_have_no_administrative_access():
+    base = {Permission.ORG_VIEW, Permission.MEMBERS_VIEW, Permission.KNOWLEDGE_VIEW}
+    # creators write their own submissions; reviewers see everyone's but cannot write
+    assert ROLE_PERMISSIONS[Role.CREATOR] == base | {Permission.SUBMISSIONS_CREATE}
+    assert ROLE_PERMISSIONS[Role.REVIEWER] == base | {Permission.SUBMISSIONS_VIEW_ALL}
     for role in (Role.CREATOR, Role.REVIEWER):
-        assert ROLE_PERMISSIONS[role] == {
-            Permission.ORG_VIEW,
-            Permission.MEMBERS_VIEW,
-            Permission.KNOWLEDGE_VIEW,
-        }
         assert not has_permission(role, Permission.KNOWLEDGE_MANAGE)
+        assert not has_permission(role, Permission.SUBMISSIONS_MANAGE_ALL)
         assert not has_permission(role, Permission.AUDIT_LOG_VIEW)
         assert not has_permission(role, Permission.INVITATIONS_MANAGE)
         assert not has_permission(role, Permission.MEMBERS_MANAGE)
@@ -97,3 +97,13 @@ def test_only_owners_and_admins_manage_knowledge_but_every_role_can_read_it():
     assert has_permission(Role.ADMIN, Permission.KNOWLEDGE_MANAGE)
     assert not has_permission(Role.REVIEWER, Permission.KNOWLEDGE_MANAGE)
     assert not has_permission(Role.CREATOR, Permission.KNOWLEDGE_MANAGE)
+
+
+def test_submission_permissions_by_role():
+    expected = {  # written out by hand, independent of the matrix code
+        Permission.SUBMISSIONS_CREATE: {Role.OWNER, Role.ADMIN, Role.CREATOR},
+        Permission.SUBMISSIONS_VIEW_ALL: {Role.OWNER, Role.ADMIN, Role.REVIEWER},
+        Permission.SUBMISSIONS_MANAGE_ALL: {Role.OWNER, Role.ADMIN},
+    }
+    for permission, roles in expected.items():
+        assert {role for role in Role if has_permission(role, permission)} == roles, permission

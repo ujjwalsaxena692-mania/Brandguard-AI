@@ -1,11 +1,12 @@
 # Rollback scripts
 
 Forward-only migrations are the norm; these scripts exist for development and
-emergencies. Apply them in **reverse order** (`0007_down` first). Each one reverses
+emergencies. Apply them in **reverse order** (`0008_down` first). Each one reverses
 exactly one migration.
 
 | Script | Effect | Data loss? |
 | --- | --- | --- |
+| `0008_down.sql` | Drops `submission_attachments`, `content_submissions` and the guard function (the storage bucket is left; empty and delete it in the dashboard) | **Yes** (all submissions, their text and attachment metadata) |
 | `0007_down.sql` | Drops `knowledge_documents` and its policy (the storage bucket is left; empty and delete it in the dashboard) | **Yes** (document metadata and extracted text) |
 | `0006_down.sql` | Drops `create_organisation`, `accept_invitation` | No |
 | `0005_down.sql` | Drops the sign-up trigger and its function | No (profiles are kept) |

@@ -1,3 +1,4 @@
+import { getActiveOrganisationId } from '@/lib/active-organisation'
 import { env } from '@/lib/env'
 import { supabase } from '@/lib/supabase'
 import type { ApiErrorBody } from '@/types/api'
@@ -38,35 +39,63 @@ async function getAccessToken(): Promise<string | null> {
   }
 }
 
+type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE'
+
+interface RequestOptions {
+  /** JSON body (sets Content-Type). */
+  body?: unknown
+  /** Multipart body, e.g. a file upload. The browser sets the Content-Type and boundary. */
+  formData?: FormData
+  signal?: AbortSignal
+}
+
 /**
- * GET JSON from the BrandGuard API.
- * Sends `Authorization: Bearer <access token>` when a session exists. The backend verifies the
- * token on every protected route; this header is only a credential, never proof by itself.
+ * Call the BrandGuard API.
+ * Sends `Authorization: Bearer <access token>` when a session exists, plus `X-Organisation-Id`
+ * when the user has chosen one of several organisations. The backend verifies the token and the
+ * membership on every protected route; these headers are only inputs, never proof by themselves.
  * `path` must be an API path (starting with "/"), so the token can only go to the API origin.
+ * A 204 response resolves to `undefined`.
  */
-export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  if (!path.startsWith('/')) throw new Error('apiGet expects a path starting with "/".')
+export async function apiRequest<T>(method: Method, path: string, options: RequestOptions = {}): Promise<T> {
+  if (!path.startsWith('/')) throw new Error('API paths must start with "/".')
 
   const headers: Record<string, string> = { Accept: 'application/json' }
   const token = await getAccessToken()
   if (token) headers.Authorization = `Bearer ${token}`
+  const organisationId = getActiveOrganisationId()
+  if (organisationId) headers['X-Organisation-Id'] = organisationId
+
+  let body: BodyInit | undefined
+  if (options.formData) {
+    body = options.formData
+  } else if (options.body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    body = JSON.stringify(options.body)
+  }
 
   let response: Response
   try {
-    response = await fetch(`${env.apiBaseUrl}${path}`, { headers, signal })
+    response = await fetch(`${env.apiBaseUrl}${path}`, { method, headers, body, signal: options.signal })
   } catch (cause) {
     if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
     throw new ApiError('Could not reach the BrandGuard API.', 0, 'network_error')
   }
 
   if (!response.ok) {
-    const body = await readErrorBody(response)
+    const error = await readErrorBody(response)
     throw new ApiError(
-      body?.message ?? `Request failed with status ${response.status}.`,
+      error?.message ?? `Request failed with status ${response.status}.`,
       response.status,
-      body?.code ?? 'http_error',
-      body?.request_id ?? null,
+      error?.code ?? 'http_error',
+      error?.request_id ?? null,
     )
   }
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
+}
+
+/** GET JSON from the BrandGuard API. */
+export function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return apiRequest<T>('GET', path, { signal })
 }

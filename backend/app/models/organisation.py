@@ -36,20 +36,33 @@ class Permission(str, Enum):
     AUDIT_LOG_VIEW = "audit:view"
     KNOWLEDGE_VIEW = "knowledge:view"  # read approved brand knowledge documents (all roles)
     KNOWLEDGE_MANAGE = "knowledge:manage"  # upload/delete them (owners and admins)
+    SUBMISSIONS_CREATE = "submissions:create"  # create/edit/submit one's own content (not reviewers)
+    SUBMISSIONS_VIEW_ALL = "submissions:view_all"  # see everyone's submissions (creators: own only)
+    SUBMISSIONS_MANAGE_ALL = "submissions:manage_all"  # act on other members' submissions
 
 
 _ALL = frozenset(Permission)
 
-# Knowledge Hub: every member can read; only owners/admins curate. Submission, review and approval
-# permissions arrive with those features.
+# Knowledge Hub: every member can read; only owners/admins curate. Submissions: creators write their
+# own, reviewers and admins see all. Review and approval permissions arrive with those features.
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.OWNER: _ALL,
     Role.ADMIN: _ALL - {Permission.MEMBERS_MANAGE_PRIVILEGED},
     Role.REVIEWER: frozenset(
-        {Permission.ORG_VIEW, Permission.MEMBERS_VIEW, Permission.KNOWLEDGE_VIEW}
+        {
+            Permission.ORG_VIEW,
+            Permission.MEMBERS_VIEW,
+            Permission.KNOWLEDGE_VIEW,
+            Permission.SUBMISSIONS_VIEW_ALL,
+        }
     ),
     Role.CREATOR: frozenset(
-        {Permission.ORG_VIEW, Permission.MEMBERS_VIEW, Permission.KNOWLEDGE_VIEW}
+        {
+            Permission.ORG_VIEW,
+            Permission.MEMBERS_VIEW,
+            Permission.KNOWLEDGE_VIEW,
+            Permission.SUBMISSIONS_CREATE,
+        }
     ),
 }
 
